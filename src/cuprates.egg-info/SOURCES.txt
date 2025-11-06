@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+src/cuprates/Hubbard_HF.py
+src/cuprates/__init__.py
+src/cuprates/bound_state_ED.py
+src/cuprates/utilities.py
+src/cuprates/vertices.py
+src/cuprates.egg-info/PKG-INFO
+src/cuprates.egg-info/SOURCES.txt
+src/cuprates.egg-info/dependency_links.txt
+src/cuprates.egg-info/requires.txt
+src/cuprates.egg-info/top_level.txt
