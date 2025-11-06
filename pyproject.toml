@@ -1,0 +1,11 @@
+[build-system]
+requires = [\"setuptools\"]
+build-backend = \"setuptools.build_meta\"
+
+[project]
+name = \"cuprates\"
+version = \"0.1.0\"
+description = \"Tools for Hartree-Fock and ED studies\"
+authors = [{name=\"Mina-Lou Schleith\"}]
+dependencies = [\"numpy\", \"matplotlib\", \"seaborn\"]
+

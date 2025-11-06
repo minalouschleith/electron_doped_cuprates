@@ -1,0 +1,1 @@
+We solve the spinon/fermion and anti-spinon/fermion bound state spectrum for our theory of the electron doped Hubbard model. We use some Hartree Fock results from a previous project, namely 'Electrons interacting with Goldstone modes in the rotating frame'.
