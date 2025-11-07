@@ -1,5 +1,3 @@
-import numpy as np 
-
 class fermion_spinon_model(object):
 
     def __init__(self,pars):
@@ -126,12 +124,12 @@ class fermion_spinon_model(object):
                     hoplist.append(self.hopping([id1,id2],ele,[0,0])) #+f(+)f(+)
                     hoplist.append(self.hopping([id1,id2],-ele,[1,1])) #-f(-)f(-) 
 
-        return hoplist 
+        self.hoplist = hoplist 
                 
     def make_scatter_list(self):
 
         '''
-        A^dagger(p1) B^\dagger(p2) C(p3) D(p4)
+        A^dagger(p1) B^dagger(p2) C(p3) D(p4)
         '''
 
         scatter_list = []
@@ -213,7 +211,7 @@ class fermion_spinon_model(object):
                             scatter_list.append(self.scattering([id3,id4],[id1,id2],-self.g_vertex(-self.total_momentum(p1,p2))*omega_den,[0,3],[1,4]))       #f(-)^dagger a(+)^dagger f(+) b(-)
                             scatter_list.append(self.scattering([id3,id4],[id1,id2],self.g_vertex(-self.total_momentum(p1,p2))*omega_den,[0,2],[1,5]))        #f(-)^dagger a(-)^dagger f(+) b(+)
 
-        return scatter_list
+        self.scatter_list = scatter_list 
 
     def do_single_hop(self,Ket,hop):
         Bra = Ket 
@@ -221,14 +219,57 @@ class fermion_spinon_model(object):
         #Ket: [f(+), f(-), b(+), b(-), a(+), a(-)]
         #hop: ([id1(final),id2(initial)],ele,[flavor(id1),flavor(id2)])
         
-        if Ket[hop.flavors[1]] > -1 and Ket[hop.flavors[0]] == -1 and Ket[hop.flavors[1]] == hop.ids[1] and Ket[hop.flavors[0]] == ids[0]:  #check occupation
-            Bra[hop.flavors[0]] = hop.ids[1]
+        if Ket[hop.flavors[1]] == hop.ids[1] and Ket[hop.flavors[0]] == -1:  #hopping possible?
+            Bra[hop.flavors[0]] = hop.ids[0]
             Bra[hop.flavors[1]] = -1
             return Bra
         else:
             return None
 
-    def do_single_scatter(self,Ket):
-        bra = []
-        return bra 
+    def do_single_scatter(self,Ket,scatter):
+        Bra = Ket 
+        # scatter.in_ids, scatter.out_ids, scatter.ele, scatter.in_flavors, scatter.out_flavors
+        if Ket[scatter.in_flavors[0]] == scatter.in_ids[0] and Ket[scatter.in_flavors[1]] == scatter.in_ids[1] and Ket[scatter.out_flavors[0]] == -1 and Ket[scatter.out_flavors[1]] == -1: #scattering possible?
+            Bra[scatter.in_flavors[0]] = -1
+            Bra[scatter.in_flavors[1]] = -1
+            Bra[scatter.out_flavors[0]] = scatter.out_ids[0]
+            Bra[scatter.out_flavors[1]] = scatter.out_ids[1] 
+            return Bra
+        else:
+            return None 
 
+    def build_Fock(self): 
+        ids_out = [] 
+        ids_in = []
+        Eles = [] 
+        for (index_in,state_in) in enumerate(self.Kets): 
+            for hop in self.hop_list: 
+                state_out = self.do_single_hop(state_in,hop)
+                if state_out is None:
+                    continue
+                else:
+                    state_out = self.Kets.find(state_out)
+                    ids_in.append(index_in)
+                    ids_out.append(index_out)
+                    Eles.append(hop.ele)
+            for scatter in self.scatter_list:
+                state_out = self.do_single_scatter(state_in,scatter) 
+                if state_out == None:
+                    continue
+                else:
+                    index_out = self.Kets.find(state_out)
+                    ids_in.append(index_in)
+                    ids_out.append(index_out)
+                    Eles.append(scatter.ele)
+        self.ids_in = ids_in
+        self.ids_out = ids_out
+        self.Eles = Eles 
+
+    def do_ED(self,q):
+        self.make_Kets(q)
+        self.make_hoplist()
+        self.make_scatter_list()
+        self.build_Fock()
+        H = sp.sparse.coo_matrix((self.Eles, (self.ids_out,self.ids_in)), shape=(self.Hildim,self.Hildim))
+        vals, vecs = sp.sparse.linalg.eigsh(H, k=10, which='SM')
+        return vals 
