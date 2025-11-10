@@ -1,5 +1,6 @@
 import numpy as np
 import scipy as sp
+import time 
 
 class fermion_spinon_model(object):
 
@@ -85,13 +86,16 @@ class fermion_spinon_model(object):
 
     def make_Kets(self,q):
         Kets = []
+        print('building fermion-spinon bound states...')
+        start = time.time()
         for id1 in range(self.N): #fermion
             p1 = self.momentum_map(id1)
             # flavors: [f(+), f(-), b(+), b(-), a(+), a(-)] 
+            # '-1' = unoccupied; id1, id2 label the single particle momenta of the bound state particles. 
             for id2 in range(self.N): #spinon/anti-spinon
                 p2 = self.momentum_map(id2) 
                 p_tot = self.total_momentum([p1,p2])
-                print(p_tot,q)
+
                 if np.array_equal(p_tot,q): 
                     Kets.append(np.array([id1, -1, id2, -1, -1, -1])) #f(+)b(+)
                     Kets.append(np.array([id1, -1, -1, id2, -1, -1])) #f(+)b(-)
@@ -99,11 +103,15 @@ class fermion_spinon_model(object):
                     Kets.append(np.array([-1, id1, -1, -1, -1, id2])) #f(-)a(-)
         self.Kets = Kets 
         self.Hildim = len(self.Kets) #Hilbert space dimension
+        end=time.time()
+        print(f'Execution time: {end - start:.4f} seconds')
 
     def make_hoplist(self):
         '''
         A^dagger(p1) B(p2) 
         '''
+        print('making list of 2-particle terms')
+        start=time.time()
         hoplist = []
         for id1 in range(self.N):
             p1 = self.momentum_map(id1) 
@@ -113,22 +121,26 @@ class fermion_spinon_model(object):
                     ele = self.dispersion(p1) 
                     hoplist.append(self.hopping([id1,id2],ele,[0,0])) #+f(+)f(+)
                     hoplist.append(self.hopping([id1,id2],ele,[1,1])) #-f(-)f(-)
-                    ele = self.omega(p1[0],p2[0]) 
+                    ele = self.omega(p1) 
                     hoplist.append(self.hopping([id1,id2],ele,[2,2])) #+b(+)b(+)
                     hoplist.append(self.hopping([id1,id2],ele,[3,3])) #+b(-)b(-)
                     hoplist.append(self.hopping([id1,id2],ele,[4,4])) #+a(+)a(+)
                     hoplist.append(self.hopping([id1,id2],ele,[5,5])) #+a(-)a(-)
-                if np.array_equal(self.total_momentum(p1,p2),self.Q):
+                if np.array_equal(self.total_momentum([p1,p2]),self.Q):
                     ele = -self.Delta 
                     hoplist.append(self.hopping([id1,id2],ele,[0,0])) #+f(+)f(+)
                     hoplist.append(self.hopping([id1,id2],-ele,[1,1])) #-f(-)f(-) 
         self.hoplist = hoplist 
-                
-    def make_scatter_list(self): 
+        end=time.time()
+        print(f'Execution time: {end - start:.4f} seconds')
 
+
+    def make_scatter_list(self): 
         '''
         A^dagger(p1) B^dagger(p2) C(p3) D(p4)
         '''
+        print('making list of 4-particle terms')
+        start=time.time()
         scatter_list = []
         for id1 in range(self.N):
             p1 = self.momentum_map(id1) #outgoing 
@@ -209,6 +221,9 @@ class fermion_spinon_model(object):
                             scatter_list.append(self.scattering([id3,id4],[id1,id2],self.g_vertex(-self.total_momentum([p1,p2]))*omega_den,[0,2],[1,5]))        #f(-)^dagger a(-)^dagger f(+) b(+)
 
         self.scatter_list = scatter_list 
+        end=time.time()
+        print(f'Execution time: {end - start:.4f} seconds')
+
 
     def do_single_hop(self,Ket,hop):
         Bra = Ket 
@@ -234,39 +249,62 @@ class fermion_spinon_model(object):
             return Bra
         else:
             return None 
+    
+    def find_state(self,state_out):
+        for (index,Ket) in enumerate(self.Kets):
+            if np.array_equal(Ket,state_out):
+                return index
+        
 
     def build_Fock(self): 
-        ids_out = [] 
-        ids_in = []
+        out_ids = [] 
+        in_ids = []
         Eles = [] 
         for (index_in,state_in) in enumerate(self.Kets): 
-            for hop in self.hop_list: 
+            for hop in self.hoplist: 
                 state_out = self.do_single_hop(state_in,hop)
                 if state_out is None:
                     continue
                 else:
-                    state_out = self.Kets.find(state_out)
-                    ids_in.append(index_in)
-                    ids_out.append(index_out)
+                    index_out = self.find_state(state_out)
+                    print(index_out)
+
+                    in_ids.append(index_in)
+                    out_ids.append(index_out)
                     Eles.append(hop.ele)
             for scatter in self.scatter_list:
                 state_out = self.do_single_scatter(state_in,scatter) 
-                if state_out == None:
+                if state_out is None:
                     continue
-                else:
-                    index_out = self.Kets.find(state_out)
-                    ids_in.append(index_in)
-                    ids_out.append(index_out)
+                else: 
+                    index_out = self.find_state(state_out)
+                    in_ids.append(index_in)
+                    out_ids.append(index_out)
                     Eles.append(scatter.ele)
-        self.ids_in = ids_in
-        self.ids_out = ids_out
+        self.in_ids = in_ids
+        self.out_ids = in_ids
         self.Eles = Eles 
 
-    def do_ED(self,q):
+
+    def do_ED(self,q,k):
+        start_tot=time.time()
         self.make_Kets(q)
         self.make_hoplist()
         self.make_scatter_list()
+        print('building sparse matrix')
+        start=time.time()
         self.build_Fock()
-        H = sp.sparse.coo_matrix((self.Eles, (self.ids_out,self.ids_in)), shape=(self.Hildim,self.Hildim))
-        vals, vecs = sp.sparse.linalg.eigsh(H, k=10, which='SM')
-        return vals 
+        H = sp.sparse.coo_matrix((self.Eles, (self.out_ids,self.in_ids)), shape=(self.Hildim,self.Hildim))
+        end=time.time()
+        print(f'Execution time: {end - start:.4f} seconds')    
+        print('diagonalizing Hamiltonian')
+        start=time.time()
+        vals, vecs = sp.sparse.linalg.eigsh(H, k=k, which='SM')
+        self.vals=vals
+        self.vec=vecs
+        end=time.time()
+        end_tot=time.time()
+        print(f'Execution time: {end - start:.4f} seconds')  
+        print(f'total runtime {end_tot - start_tot:.4f} seconds')  
+        
+    
