@@ -301,7 +301,7 @@ class fermion_spinon_model(object):
         start=time.time()
         vals, vecs = sp.sparse.linalg.eigsh(H, k=k, which='SM')
         self.vals=vals
-        self.vec=vecs
+        self.vecs=vecs
         end=time.time()
         end_tot=time.time()
         print(f'Execution time: {end - start:.4f} seconds')  
