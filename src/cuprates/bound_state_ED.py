@@ -10,22 +10,21 @@ class fermion_spinon_model(object):
         self.Ny = pars['Ny']
         self.N = pars['Nx']*pars['Ny']
         self.tp = pars['tp']            #ratio t_2/t_1 with t_1 NN hopping, t_2 NNN hopping
-        self.m = pars['m']              #Goldstone mass
+        self.m = pars['m']              #spinon mass
         self.c = pars['c']              #Goldstone velocity
-        self.chi = pars['chi']          #Goldstone stiffness (?)
+        self.omega_s = pars['omega_s']
+        self.chi = self.omega_s/self.a/self.c          #Goldstone stiffness from HF 
         self.Delta = pars['Delta']      #fermion gap
-        chi = pars['chi']
-        Delta = pars['Delta']
-        c = pars['c']
+        self.g_spin = pars['g_spin']    #array of vertices 
         self.chi_tilde = 2*self.chi*self.Delta**2*self.c**2  #renormalized gap
         self.mu = pars['mu']            #chemical potential
-        Qx = int(np.floor(self.Nx/2))
-        Qy = int(np.floor(self.Ny/2))
+        Qx = int(self.Nx/2)
+        Qy = int(self.Ny/2) 
         self.Q = np.array([Qx,Qy])      #AFM ordering vector
-        self.mp =  pars['Nx']*pars['Ny']       #regularization of IR divergence 
+        self.mp =  1/self.Nx/self.Ny       #regularization of IR divergence 
 
     def dispersion(self,p):
-        return 2*(np.cos(p[0]*self.a)+np.cos(p[1]*self.a)) + 4*self.tp*np.cos(p[0]*self.a)*np.cos(p[1]*self.a)
+        return 2*(np.cos(p[0]*self.a)+np.cos(p[1]*self.a)) + 4*self.tp*np.cos(p[0]*self.a)*np.cos(p[1]*self.a) + self.mu
 
     def omega(self,p):
         return np.sqrt(p[0]**2+p[1]**2+self.m**2)
@@ -37,8 +36,13 @@ class fermion_spinon_model(object):
         return 1/(2*self.chi_tilde*np.sqrt(self.omega(p1)*self.omega(p2)))
     
     #to do 
-    def g_vertex(self,p): 
-        return 1
+    def g_vertex(self,p):
+        g_spin = self.g_spin 
+        mid_x = int(self.Nx)
+        mid_y = int(self.Ny) 
+        mid_x = np.mod(mid_x+p[0],self.Nx)
+        mid_y = np.mod(mid_y+p[1],self.Ny)
+        return g_spin[mid_x,mid_y] 
 
     class hopping:
         def __init__(self,ids,ele,flavors):
@@ -121,12 +125,13 @@ class fermion_spinon_model(object):
                     ele = self.dispersion(p1) 
                     hoplist.append(self.hopping([id1,id2],ele,[0,0])) #+f(+)f(+)
                     hoplist.append(self.hopping([id1,id2],ele,[1,1])) #-f(-)f(-)
-                    ele = self.omega(p1) 
+                    ele = -self.omega(p1) 
                     hoplist.append(self.hopping([id1,id2],ele,[2,2])) #+b(+)b(+)
                     hoplist.append(self.hopping([id1,id2],ele,[3,3])) #+b(-)b(-)
                     hoplist.append(self.hopping([id1,id2],ele,[4,4])) #+a(+)a(+)
                     hoplist.append(self.hopping([id1,id2],ele,[5,5])) #+a(-)a(-)
-                if np.array_equal(self.total_momentum([p1,p2]),self.Q):
+                if np.array_equal(p1,self.total_momentum([p2,-self.Q])):
+                    # hopping([id1, id2], flavor(id1), flavor(id2))
                     ele = -self.Delta 
                     hoplist.append(self.hopping([id1,id2],ele,[0,0])) #+f(+)f(+)
                     hoplist.append(self.hopping([id1,id2],-ele,[1,1])) #-f(-)f(-) 
@@ -150,23 +155,23 @@ class fermion_spinon_model(object):
                     p3 = self.momentum_map(id3) #incoming
                     for id4 in range(self.N):
                         p4 = self.momentum_map(id4) #incoming 
-                        omega_den = self.omega_denominator(p2,p4)
+                        omega_den = self.omega_denominator(p2,p4) 
                         if np.array_equal(self.total_momentum([p1,p2]),self.total_momentum([p3,p4])):
-                            #[id3,id4], [id1,id2], ele, [flavor(p3),flavor(p4)], [flavor(p1),flavor(p2)] 
+                            #incoming: [id3,id4], outgoing: [id1,id2], ele, incoming: [flavor(p3),flavor(p4)], outgoing: [flavor(p1),flavor(p2)] 
                             #flavors: [f(+), f(-), b(+), b(-), a(+), a(-)] 
                             p_rel_1 = self.total_momentum([p1,p2])
                             p_rel_2 = self.total_momentum([p1,-p4]) 
                             scatter_list.append(self.scattering([id3,id4],[id1,id2],self.dispersion(p_rel_1)*omega_den,[1,5],[0,2]))        #f(+)^dagger b(+)^dagger f(-) a(-)
                             scatter_list.append(self.scattering([id3,id4],[id1,id2],-self.dispersion(p_rel_1)*omega_den,[1,4],[0,3]))       #f(+)^dagger b(-)^dagger f(-) a(+)
                             scatter_list.append(self.scattering([id3,id4],[id1,id2],-self.dispersion(p_rel_2)*omega_den,[1,4],[0,3]))      #f(+)^dagger b(-)^dagger f(-) a(+)
-                            scatter_list.append(self.scattering([id3,id4],[id1,id2],self.dispersion(self.total_momentum([p1,-p4]))*omega_den,[1,5],[0,2]))       #f(+)^dagger b(+)^dagger f(-) a(-)
+                            scatter_list.append(self.scattering([id3,id4],[id1,id2],self.dispersion(p_rel_2)*omega_den,[1,5],[0,2]))       #f(+)^dagger b(+)^dagger f(-) a(-)
 
-                            scatter_list.append(self.scattering([id3,id4],[id1,id2],-self.dispersion(self.total_momentum([p1,-p4]))*omega_den,[0,2],[1,5]))      #f(-)^dagger a(-)^dagger f(+) b(+) 
-                            scatter_list.append(self.scattering([id3,id4],[id1,id2],self.dispersion(self.total_momentum([p1,-p4]))*omega_den,[0,3],[1,4]))       #f(-)^dagger a(+)^dagger f(+) b(-) 
-                            scatter_list.append(self.scattering([id3,id4],[id1,id2],-self.dispersion(self.total_momentum([p1,p2]))*omega_den,[0,3],[1,4]))       #f(-)^dagger a(+)^dagger f(+) b(-)
-                            scatter_list.append(self.scattering([id3,id4],[id1,id2],self.dispersion(self.total_momentum([p1,p2]))*omega_den,[0,2],[1,5]))        #f(-)^dagger a(-)^dagger f(+) b(+)
+                            scatter_list.append(self.scattering([id3,id4],[id1,id2],-self.dispersion(p_rel_2)*omega_den,[0,2],[1,5]))      #f(-)^dagger a(-)^dagger f(+) b(+) 
+                            scatter_list.append(self.scattering([id3,id4],[id1,id2],self.dispersion(p_rel_2)*omega_den,[0,3],[1,4]))       #f(-)^dagger a(+)^dagger f(+) b(-) 
+                            scatter_list.append(self.scattering([id3,id4],[id1,id2],-self.dispersion(p_rel_1)*omega_den,[0,3],[1,4]))       #f(-)^dagger a(+)^dagger f(+) b(-)
+                            scatter_list.append(self.scattering([id3,id4],[id1,id2],self.dispersion(p_rel_1)*omega_den,[0,2],[1,5]))        #f(-)^dagger a(-)^dagger f(+) b(+)
 
-                            #electromagnetic interaction 
+                            # "electromagnetic" interaction 
                             #fermions spinons 
                             p = self.total_momentum([p1,-p3])
                             scatter_list.append(self.scattering([id3,id4],[id1,id2], self.V(p), [0,4], [0,4])) 
@@ -210,15 +215,15 @@ class fermion_spinon_model(object):
 
                         if np.array_equal(self.total_momentum([p1,p2]),self.total_momentum([p3,p4,self.Q])):
                             
-                            scatter_list.append(self.scattering([id3,id4],[id1,id2],self.g_vertex(-self.total_momentum([p1,p2]))*omega_den,[1,5],[0,2]))        #f(+)^dagger b(+)^dagger f(-) a(-)
-                            scatter_list.append(self.scattering([id3,id4],[id1,id2],-self.g_vertex(-self.total_momentum([p1,p2]))*omega_den,[1,4],[0,3]))       #f(+)^dagger b(-)^dagger f(-) a(+)
-                            scatter_list.append(self.scattering([id3,id4],[id1,id2],-self.g_vertex(-self.total_momentum([p1,-p4]))*omega_den,[1,4],[0,3]))      #f(+)^dagger b(-)^dagger f(-) a(+)
-                            scatter_list.append(self.scattering([id3,id4],[id1,id2],self.dispersion(-self.total_momentum([p1,-p4]))*omega_den,[1,5],[0,2]))       #f(+)^dagger b(+)^dagger f(-) a(-)
+                            scatter_list.append(self.scattering([id3,id4],[id1,id2],-2*self.g_vertex(-p_rel_1)*omega_den,[1,5],[0,2]))        #f(+)^dagger b(+)^dagger f(-) a(-)
+                            scatter_list.append(self.scattering([id3,id4],[id1,id2],2*self.g_vertex(-p_rel_1)*omega_den,[1,4],[0,3]))       #f(+)^dagger b(-)^dagger f(-) a(+)
+                            scatter_list.append(self.scattering([id3,id4],[id1,id2],-2*self.g_vertex(-p_rel_2)*omega_den,[1,4],[0,3]))      #f(+)^dagger b(-)^dagger f(-) a(+)
+                            scatter_list.append(self.scattering([id3,id4],[id1,id2],2*self.g_vertex(-p_rel_2)*omega_den,[1,5],[0,2]))       #f(+)^dagger b(+)^dagger f(-) a(-)
 
-                            scatter_list.append(self.scattering([id3,id4],[id1,id2],-self.g_vertex(-self.total_momentum([p1,-p4]))*omega_den,[0,2],[1,5]))      #f(-)^dagger a(-)^dagger f(+) b(+) 
-                            scatter_list.append(self.scattering([id3,id4],[id1,id2],self.g_vertex(-self.total_momentum([p1,-p4]))*omega_den,[0,3],[1,4]))       #f(-)^dagger a(+)^dagger f(+) b(-) 
-                            scatter_list.append(self.scattering([id3,id4],[id1,id2],-self.g_vertex(-self.total_momentum([p1,p2]))*omega_den,[0,3],[1,4]))       #f(-)^dagger a(+)^dagger f(+) b(-)
-                            scatter_list.append(self.scattering([id3,id4],[id1,id2],self.g_vertex(-self.total_momentum([p1,p2]))*omega_den,[0,2],[1,5]))        #f(-)^dagger a(-)^dagger f(+) b(+)
+                            scatter_list.append(self.scattering([id3,id4],[id1,id2],-2*self.g_vertex(-p_rel_2)*omega_den,[0,2],[1,5]))      #f(-)^dagger a(-)^dagger f(+) b(+) 
+                            scatter_list.append(self.scattering([id3,id4],[id1,id2],2*self.g_vertex(-p_rel_2)*omega_den,[0,3],[1,4]))       #f(-)^dagger a(+)^dagger f(+) b(-) 
+                            scatter_list.append(self.scattering([id3,id4],[id1,id2],-2*self.g_vertex(-p_rel_1)*omega_den,[0,3],[1,4]))       #f(-)^dagger a(+)^dagger f(+) b(-)
+                            scatter_list.append(self.scattering([id3,id4],[id1,id2],2*self.g_vertex(-p_rel_1)*omega_den,[0,2],[1,5]))        #f(-)^dagger a(-)^dagger f(+) b(+)
 
         self.scatter_list = scatter_list 
         end=time.time()
