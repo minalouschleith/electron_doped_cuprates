@@ -1,17 +1,18 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from cuprates import *
+
 
 pars = {} 
 pars['a'] = 1.0
-pars['Nx'] = 3
-pars['Ny'] = 3
+pars['Nx'] = 10
+pars['Ny'] = 10 
 pars['tp'] = -0.35      #next-nearest neighbor hopping 
 pars['m'] = 1.0         #to do
-pars['c'] = 0.988       #Goldstone velocity
-pars['chi'] = 1.0       #to do
-pars['Delta'] = 1.0     #to do
+pars['c'] = c           #Goldstone velocity from HF 
+pars['omega_s'] = Ws    #rescaling factor from HF 
+pars['Delta'] = 0.5     # study regime \Delta < 1 
 pars['mu'] = 0.0        #chemical potential
+pars['g_spin'] = g_spin  
 
 k = 10 
 px=0
