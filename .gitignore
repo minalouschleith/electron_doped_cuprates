@@ -11,3 +11,6 @@ __pycache__/
 results/
 notebooks/
 *.egg-info/
+
+#log files 
+job_logs/
